@@ -71,6 +71,7 @@ require (
 	github.com/tyler-smith/go-bip39 v1.1.0
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
+	gopkg.in/olahol/melody.v1 v1.0.0-20170518105555-d52139073376
 	gorm.io/driver/postgres v1.4.5
 	gorm.io/gorm v1.24.1
 )

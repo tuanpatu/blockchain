@@ -22,6 +22,10 @@ var (
 	transactionsController controllers.TransactionsController
 	transactionsRoute      TransactionsRoute
 
+	walletsService    services.WalletsService
+	walletsController controllers.WalletsController
+	walletsRoute      WalletsRoute
+
 	ctx context.Context
 )
 
@@ -52,9 +56,14 @@ func InitRouter() *gin.Engine {
 	transactionsController = controllers.NewTransactionsController(transactionsService)
 	transactionsRoute = NewTransactionsRoute(transactionsController)
 
+	walletsService = services.NewWalletsService(db)
+	walletsController = controllers.NewWalletsController(walletsService)
+	walletsRoute = NewWalletRoute(walletsController)
+
 	basepath := app.Group("/api")
 	usersRoute.RegisterRoutes(basepath)
 	transactionsRoute.RegisterRoutes(basepath)
+	walletsRoute.RegisterRoutes(basepath)
 
 	return app
 }

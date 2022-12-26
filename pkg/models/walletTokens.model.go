@@ -10,5 +10,5 @@ type WalletTokens struct {
 	WalletId uint   `json:"wallet_id" xml:"wallet_id" form:"wallet_id"`
 	Name     string `json:"name" xml:"name" form:"name"`
 	Symbol   string `json:"symbol" xml:"symbol" form:"symbol"`
-	Amount   string `json:"amount" xml:"amount" form:"amount"`
+	Amount   uint   `json:"amount" xml:"amount" form:"amount"`
 }

@@ -14,6 +14,7 @@ import (
 	tptoken "blockchain/contracts"
 	"blockchain/pkg/models"
 	"blockchain/pkg/routes"
+	"blockchain/pkg/services"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -38,7 +39,7 @@ type LogApproval struct {
 }
 
 var (
-	db          *gorm.DB
+	db          *gorm.DB = models.ConnectDataBase()
 	ctx         context.Context
 	url         = "https://goerli.infura.io/v3/1d9d0d19d4df45a99d2f4d162a7d830e"
 	client, err = ethclient.DialContext(ctx, url)
@@ -67,7 +68,8 @@ func main() {
 	defer models.CloseDatabaseConnection(db)
 	app := routes.InitRouter()
 
-	app.GET("/", func(ctx *gin.Context) {
+	app.GET("/ws", func(ctx *gin.Context) {
+		fmt.Println("start subscription")
 		clienWss, err := ethclient.Dial("wss://goerli.infura.io/ws/v3/1d9d0d19d4df45a99d2f4d162a7d830e")
 		contractAddress := common.HexToAddress("0xDE2cBDE6E00F529d4DE278d950c1F9E686A2c952")
 		query := ethereum.FilterQuery{
@@ -100,7 +102,7 @@ func main() {
 
 					var transferEvent LogTransfer
 
-					data, err := contractAbi.Unpack("Approval", vLog.Data)
+					data, err := contractAbi.Unpack("Transfer", vLog.Data)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -114,25 +116,24 @@ func main() {
 					fmt.Printf("From: %s\n", transferEvent.From.Hex())
 					fmt.Printf("To: %s\n", transferEvent.To.Hex())
 					fmt.Printf("TPT Tokens wei: %s\n", transferEvent.Tokens.String())
-					if transferEvent.To.String() == "0x50710d2de5c8daab8977cea01c0a47bda593272b" {
-						fmt.Println("Recive token from user")
+
+					if transferEvent.To.String() == "0x50710d2dE5C8dAAB8977CEa01c0A47BdA593272B" {
+						us := services.NewUsersService(db)
+						senderAdrress := strings.ToLower(transferEvent.From.String())
+						err, sendUser := us.GetUserByAddress(&senderAdrress)
+						if err != nil {
+							fmt.Println(err)
+						} else {
+							walletToken := models.WalletTokens{
+								WalletId: sendUser.Wallet.ID,
+								Name:     "TPToken",
+								Symbol:   "TPT",
+								Amount:   uint(transferEvent.Tokens.Uint64()),
+							}
+
+							err = db.Create(&walletToken).Error
+						}
 					}
-
-					// us := services.NewUsersService(db)
-					// senderAdrress := transferEvent.From.String()
-					// err, sendUser := us.GetUserByAddress(&senderAdrress)
-
-					// if transferEvent.To.String() == "0x50710d2dE5C8dAAB8977CEa01c0A47BdA593272B" {
-					// 	fmt.Println(sendUser)
-					// 	walletToken := models.WalletTokens{
-					// 		WalletId: sendUser.Wallet.ID,
-					// 		Name:     "TPToken",
-					// 		Symbol:   "TPT",
-					// 		Amount:   transferEvent.Tokens.String(),
-					// 	}
-
-					// 	err = db.Create(&walletToken).Error
-					// }
 
 				case logApprovalSigHash.Hex():
 					fmt.Printf("Log Name: Approval\n")
@@ -155,5 +156,6 @@ func main() {
 			}
 		}
 	})
+
 	app.Run(":3003")
 }
