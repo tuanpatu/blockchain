@@ -30,7 +30,7 @@ func NewTransactionsService(ctx context.Context) TransactionsService {
 type TransferParams struct {
 	R      string `json:"recipient" xml:"recipient" form:"recipient"`
 	S      string `json:"sender" xml:"sender" form:"sender"`
-	Amount int    `json:"amount" xml:"amount" form:"amount"`
+	Amount uint   `json:"amount" xml:"amount" form:"amount"`
 }
 
 var (
@@ -63,7 +63,13 @@ func (r *TransactionsServiceImpl) Transfer(transferParams *TransferParams) (erro
 		return err, nil
 	}
 
-	tokenAddress := common.HexToAddress("0x28b149020d2152179873ec60bed6bf7cd705775d")
+	value := big.NewInt(0)
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return err, nil
+	}
+
+	tokenAddress := common.HexToAddress("0xDE2cBDE6E00F529d4DE278d950c1F9E686A2c952")
 
 	transferFnSignature := []byte("transfer(address,uint256)")
 	hash := sha3.NewLegacyKeccak256()
@@ -72,35 +78,32 @@ func (r *TransactionsServiceImpl) Transfer(transferParams *TransferParams) (erro
 	fmt.Println(hexutil.Encode(methodID)) // 0xa9059cbb
 
 	paddedAddress := common.LeftPadBytes(recipientAddress.Bytes(), 32)
-
+	fmt.Println(hexutil.Encode(paddedAddress))
+	// amount := new(big.Int)
 	amount := big.NewInt(int64(transferParams.Amount))
-
+	// amount.SetString("100000000000000000000", 10)
 	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
-
+	fmt.Println(hexutil.Encode(paddedAmount))
 	var data []byte
 	data = append(data, methodID...)
 	data = append(data, paddedAddress...)
 	data = append(data, paddedAmount...)
 
 	gasLimit, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
-		To:   &tokenAddress,
+		To:   &recipientAddress,
 		Data: data,
 	})
 	if err != nil {
-		log.Fatal(err)
-	}
-	gas, err := client.SuggestGasPrice(context.Background())
-
-	if err != nil {
+		log.Fatal("err:", err)
 		return err, nil
 	}
-
+	fmt.Println(gasLimit)
 	ChainID, err := client.NetworkID(context.Background())
 	if err != nil {
 		return err, nil
 	}
 
-	transaction := types.NewTransaction(nonce, recipientAddress, amount, gasLimit, gas, data)
+	transaction := types.NewTransaction(nonce, tokenAddress, value, gasLimit, gasPrice, data)
 	signedTx, err := types.SignTx(transaction, types.NewEIP155Signer(ChainID), privateKey)
 	if err != nil {
 		return err, nil

@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	tptoken "blockchain/contracts"
+	usdt "blockchain/contracts/USDT"
 	"blockchain/pkg/models"
 	"blockchain/pkg/routes"
 	"blockchain/pkg/services"
@@ -41,7 +41,7 @@ type LogApproval struct {
 var (
 	db          *gorm.DB = models.ConnectDataBase()
 	ctx         context.Context
-	url         = "https://goerli.infura.io/v3/1d9d0d19d4df45a99d2f4d162a7d830e"
+	url         = "https://mainnet.infura.io/v3/1d9d0d19d4df45a99d2f4d162a7d830e"
 	client, err = ethclient.DialContext(ctx, url)
 )
 
@@ -70,8 +70,8 @@ func main() {
 
 	app.GET("/ws", func(ctx *gin.Context) {
 		fmt.Println("start subscription")
-		clienWss, err := ethclient.Dial("wss://goerli.infura.io/ws/v3/1d9d0d19d4df45a99d2f4d162a7d830e")
-		contractAddress := common.HexToAddress("0xDE2cBDE6E00F529d4DE278d950c1F9E686A2c952")
+		clienWss, err := ethclient.Dial("wss://mainnet.infura.io/ws/v3/1d9d0d19d4df45a99d2f4d162a7d830e")
+		contractAddress := common.HexToAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7")
 		query := ethereum.FilterQuery{
 			Addresses: []common.Address{contractAddress},
 		}
@@ -82,20 +82,22 @@ func main() {
 			log.Fatal(err)
 		}
 
-		contractAbi, err := abi.JSON(strings.NewReader(string(tptoken.TptokenABI)))
+		contractAbi, err := abi.JSON(strings.NewReader(string(usdt.StoreABI)))
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		logTransferSig := []byte("Transfer(address,address,uint256)")
 		LogApprovalSig := []byte("Approval(address,address,uint256)")
 		logTransferSigHash := crypto.Keccak256Hash(logTransferSig)
 		logApprovalSigHash := crypto.Keccak256Hash(LogApprovalSig)
-
+		count := 0
 		for {
 			select {
 			case err := <-sub.Err():
 				log.Fatal("err:", err)
 			case vLog := <-logs:
+				count += 1
 				switch vLog.Topics[0].Hex() {
 				case logTransferSigHash.Hex():
 					fmt.Printf("Log Name: Transfer\n")
@@ -107,15 +109,13 @@ func main() {
 						log.Fatal(err)
 					}
 
-					fmt.Println("data", data[0])
-
 					transferEvent.From = common.HexToAddress(vLog.Topics[1].Hex())
 					transferEvent.To = common.HexToAddress(vLog.Topics[2].Hex())
 					transferEvent.Tokens = data[0].(*big.Int)
 
-					fmt.Printf("From: %s\n", transferEvent.From.Hex())
-					fmt.Printf("To: %s\n", transferEvent.To.Hex())
-					fmt.Printf("TPT Tokens wei: %s\n", transferEvent.Tokens.String())
+					// fmt.Printf("From: %s\n", transferEvent.From.Hex())
+					// fmt.Printf("To: %s\n", transferEvent.To.Hex())
+					// fmt.Printf("TPT Tokens wei: %s\n", transferEvent.Tokens.String())
 
 					if transferEvent.To.String() == "0x50710d2dE5C8dAAB8977CEa01c0A47BdA593272B" {
 						us := services.NewUsersService(db)
@@ -149,10 +149,11 @@ func main() {
 					approvalEvent.Spender = common.HexToAddress(vLog.Topics[2].Hex())
 					approvalEvent.Tokens = data[0].(*big.Int)
 
-					fmt.Printf("Token Owner: %s\n", approvalEvent.TokenOwner.Hex())
-					fmt.Printf("Spender: %s\n", approvalEvent.Spender.Hex())
-					fmt.Printf("TPT Tokens wei: %s\n", approvalEvent.Tokens.String())
+					// fmt.Printf("Token Owner: %s\n", approvalEvent.TokenOwner.Hex())
+					// fmt.Printf("Spender: %s\n", approvalEvent.Spender.Hex())
+					// fmt.Printf("TPT Tokens wei: %s\n", approvalEvent.Tokens.String())
 				}
+				fmt.Println(count)
 			}
 		}
 	})
